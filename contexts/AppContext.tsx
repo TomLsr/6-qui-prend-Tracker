@@ -21,7 +21,7 @@ interface AppContextType {
     setPlayers: React.Dispatch<React.SetStateAction<Player[]>>;
     games: Game[];
     setGames: React.Dispatch<React.SetStateAction<Game[]>>;
-    addPlayer: (playerData: Omit<Player, 'id'>) => Promise<void>;
+    addPlayer: (playerData: Omit<Player, 'id'>) => Promise<Player | null>;
     updatePlayer: (updatedPlayer: Player) => Promise<void>;
     deletePlayer: (playerId: string) => Promise<void>;
     addGame: (gameData: Omit<Game, 'id'>) => Promise<Game | null>;
@@ -66,16 +66,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }, []);
 
 
-    const addPlayer = async (playerData: Omit<Player, 'id'>) => {
+    const addPlayer = async (playerData: Omit<Player, 'id'>): Promise<Player | null> => {
         try {
             const { data, error } = await supabase.from('players').insert([playerData]).select();
             if (error) throw error;
-            if (data) {
+            if (data && data[0]) {
                 setPlayers(prev => [...prev, ...data]);
+                return data[0];
             }
+            return null;
         } catch (error) {
             console.error('Error adding player:', error);
             alert('Erreur lors de l\'ajout du joueur.');
+            return null;
         }
     };
     
