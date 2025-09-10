@@ -12,6 +12,7 @@ export enum Screen {
     PLAYER_PROFILE,
     HALL_OF_FAME,
     HISTORY,
+    STATS,
 }
 
 interface NewGameData {

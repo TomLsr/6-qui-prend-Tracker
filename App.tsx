@@ -9,6 +9,7 @@ import LeaderboardScreen from './screens/LeaderboardScreen';
 import PlayerProfileScreen from './screens/PlayerProfileScreen';
 import HallOfFameScreen from './screens/HallOfFameScreen';
 import HistoryScreen from './screens/HistoryScreen';
+import StatsScreen from './screens/StatsScreen';
 import { GameData } from './types';
 
 const App: React.FC = () => {
@@ -52,6 +53,8 @@ const App: React.FC = () => {
                 return <HallOfFameScreen />;
             case Screen.HISTORY:
                 return <HistoryScreen />;
+            case Screen.STATS:
+                return <StatsScreen />;
             default:
                 return <HomeScreen />;
         }

@@ -7,6 +7,7 @@ const HomeScreen: React.FC = () => {
     const menuItems = [
         { label: 'Nouvelle Partie', screen: Screen.NEW_GAME, icon: '🎮' },
         { label: 'Classement', screen: Screen.LEADERBOARD, icon: '🏆' },
+        { label: 'Statistiques', screen: Screen.STATS, icon: '📊' },
         { label: 'Joueurs', screen: Screen.PLAYERS, icon: '👥' },
         { label: 'Palmarès', screen: Screen.HALL_OF_FAME, icon: '🏅' },
         { label: 'Historique', screen: Screen.HISTORY, icon: '📜' },

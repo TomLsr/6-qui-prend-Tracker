@@ -1,18 +1,34 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { AppContext, Screen } from '../contexts/AppContext';
-import { calculatePlayerProfile } from '../services/statsService';
+import { calculatePlayerProfile, calculatePlayerScoreHistory } from '../services/statsService';
 import PlayerAvatar from '../components/PlayerAvatar';
 import StatCard from '../components/StatCard';
 import { AVATARS } from '../constants';
 import { Player } from '../types';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface PlayerProfileScreenProps {
     playerId: string;
 }
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-gray-700 p-2 border border-gray-600 rounded">
+                <p className="label font-bold">{`${label}`}</p>
+                <p className="text-orange-400">{`Score : ${payload[0].value}`}</p>
+                <p className="text-gray-300">{`Date : ${payload[0].payload.date}`}</p>
+                <p className="text-gray-300">{`Classement : ${payload[0].payload.rank}`}</p>
+            </div>
+        );
+    }
+    return null;
+};
+
 const PlayerProfileScreen: React.FC<PlayerProfileScreenProps> = ({ playerId }) => {
     const { players, games, setScreen, updatePlayer } = useContext(AppContext);
     const profile = calculatePlayerProfile(playerId, players, games);
+    const scoreHistory = calculatePlayerScoreHistory(playerId, games);
 
     const [isEditing, setIsEditing] = useState(false);
     const [editedPseudo, setEditedPseudo] = useState('');
@@ -33,7 +49,7 @@ const PlayerProfileScreen: React.FC<PlayerProfileScreenProps> = ({ playerId }) =
     
     const { 
         player, gamesPlayed, wins, winRate,
-        avgScorePerGame, avgScorePerRound,
+        avgScorePerGame,
         bestScore, worstScore,
         nemesis, luckyCharm
     } = profile;
@@ -151,11 +167,28 @@ const PlayerProfileScreen: React.FC<PlayerProfileScreenProps> = ({ playerId }) =
                     <StatCard label="Victoires" value={wins} />
                     <StatCard label="Taux de Victoire" value={`${winRate.toFixed(1)}%`} />
                     <StatCard label="Score Moyen / Partie" value={avgScorePerGame.toFixed(2)} />
-                    <StatCard label="Score Moyen / Manche" value={avgScorePerRound.toFixed(2)} />
                     <StatCard label="Meilleur Score" value={bestScore ?? 'N/A'} />
                     <StatCard label="Pire Score" value={worstScore ?? 'N/A'} />
                 </div>
             </div>
+
+            {scoreHistory.length > 1 && (
+                <div>
+                    <h3 className="text-2xl font-bold mb-4">Évolution des Scores</h3>
+                    <div className="bg-gray-800 p-4 rounded-lg" style={{ height: '400px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={scoreHistory}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#4A5568" />
+                                <XAxis dataKey="name" stroke="#A0AEC0"/>
+                                <YAxis stroke="#A0AEC0"/>
+                                <Tooltip content={<CustomTooltip />} />
+                                <Legend />
+                                <Line type="monotone" dataKey="score" name="Score Final" stroke="#F6AD55" strokeWidth={2} activeDot={{ r: 8 }} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
             
             <div>
                  <h3 className="text-2xl font-bold mb-4">Statistiques Amusantes</h3>

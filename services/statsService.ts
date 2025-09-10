@@ -158,3 +158,122 @@ export const calculateHallOfFame = (players: Player[], games: GameData[]) => {
 
     return { king, collector, metronome };
 };
+
+
+export const calculatePlayerScoreHistory = (playerId: string, games: GameData[]) => {
+    const playerGames = games
+      .filter(g => g.participants.some(p => p.player && p.player.id === playerId))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+    return playerGames.map((game, index) => {
+      const sortedParticipants = [...game.participants].sort((a, b) => a.score - b.score);
+      const playerParticipant = game.participants.find(p => p.player.id === playerId)!;
+      const rank = sortedParticipants.findIndex(p => p.player.id === playerId) + 1;
+  
+      return {
+        name: `Partie ${index + 1}`,
+        score: playerParticipant.score,
+        date: new Date(game.date).toLocaleDateString('fr-FR'),
+        rank: `${rank}/${game.participants.length}`,
+      };
+    });
+  };
+  
+  export const calculateGlobalStats = (games: GameData[]) => {
+    if (games.length === 0) {
+      return {
+        gameIntensityData: [],
+        gameAttendanceData: [],
+        scoreDistributionData: [],
+        tightestGame: null,
+        mostExplosiveGame: null,
+      };
+    }
+  
+    const sortedGames = [...games].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+    const gameIntensityData = sortedGames.map((game, index) => {
+      const totalScore = game.participants.reduce((sum, p) => sum + p.score, 0);
+      const avgScore = totalScore / game.participants.length;
+      return {
+        name: `Partie ${index + 1}`,
+        "Score Moyen": parseFloat(avgScore.toFixed(2)),
+        date: new Date(game.date).toLocaleDateString('fr-FR'),
+      };
+    });
+  
+    const gameAttendanceData = sortedGames.map((game, index) => ({
+      name: `Partie ${index + 1}`,
+      "Joueurs": game.participants.length,
+      date: new Date(game.date).toLocaleDateString('fr-FR'),
+    }));
+  
+    const allScores = games.flatMap(g => g.participants.map(p => p.score));
+    const scoreBuckets: {[key: string]: number} = {
+      '0-10': 0, '11-20': 0, '21-30': 0, '31-40': 0, '41-50': 0, '51-65': 0, '66+': 0,
+    };
+    allScores.forEach(score => {
+      if (score <= 10) scoreBuckets['0-10']++;
+      else if (score <= 20) scoreBuckets['11-20']++;
+      else if (score <= 30) scoreBuckets['21-30']++;
+      else if (score <= 40) scoreBuckets['31-40']++;
+      else if (score <= 50) scoreBuckets['41-50']++;
+      else if (score <= 65) scoreBuckets['51-65']++;
+      else scoreBuckets['66+']++;
+    });
+    const scoreDistributionData = Object.entries(scoreBuckets).map(([name, count]) => ({
+      name, "Nombre de fois": count,
+    }));
+    
+    let tightestGame: { game: GameData; gap: number } | null = null;
+    let mostExplosiveGame: { game: GameData; totalScore: number } | null = null;
+  
+    games.forEach(game => {
+      if (game.participants.length < 2) return;
+      const scores = game.participants.map(p => p.score);
+      const minScore = Math.min(...scores);
+      const maxScore = Math.max(...scores);
+      const gap = maxScore - minScore;
+      
+      if (tightestGame === null || gap < tightestGame.gap) {
+        tightestGame = { game, gap };
+      }
+      
+      const totalScore = scores.reduce((sum, s) => sum + s, 0);
+      if(mostExplosiveGame === null || totalScore > mostExplosiveGame.totalScore) {
+          mostExplosiveGame = { game, totalScore };
+      }
+    });
+  
+    return { gameIntensityData, gameAttendanceData, scoreDistributionData, tightestGame, mostExplosiveGame };
+  };
+  
+  
+  export const calculateWinRateByPlayerCount = (players: Player[], games: GameData[]) => {
+    const stats: { [playerId: string]: { [playerCount: number]: { wins: number, games: number } } } = {};
+    const playerCounts = new Set<number>();
+  
+    players.forEach(p => stats[p.id] = {});
+  
+    games.forEach(game => {
+      const count = game.participants.length;
+      if (count < 2) return;
+  
+      playerCounts.add(count);
+      
+      game.participants.forEach(participant => {
+        if (!participant.player) return;
+        if (!stats[participant.player.id][count]) {
+          stats[participant.player.id][count] = { wins: 0, games: 0 };
+        }
+        stats[participant.player.id][count].games++;
+        if (participant.player.id === game.winner_id) {
+          stats[participant.player.id][count].wins++;
+        }
+      });
+    });
+  
+    const sortedPlayerCounts = Array.from(playerCounts).sort((a,b) => a - b);
+    
+    return { stats, playerCounts: sortedPlayerCounts };
+  };
