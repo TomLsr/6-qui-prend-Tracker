@@ -1,4 +1,3 @@
-
 import React, { useContext } from 'react';
 import { AppContext, Screen } from './contexts/AppContext';
 import PlayersScreen from './screens/PlayersScreen';
@@ -16,7 +15,8 @@ const App: React.FC = () => {
         screen, setScreen, 
         activeGame, setActiveGame, 
         selectedPlayerId,
-        selectedGame
+        selectedGame,
+        loading,
     } = useContext(AppContext);
 
     const renderScreen = () => {
@@ -107,7 +107,13 @@ const App: React.FC = () => {
                     </h1>
                 </header>
                 <main>
-                    {renderScreen()}
+                    {loading ? (
+                        <div className="flex justify-center items-center h-64">
+                            <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-orange-500"></div>
+                        </div>
+                    ) : (
+                        renderScreen()
+                    )}
                 </main>
                 <footer className="text-center mt-12 text-gray-500">
                     <p>&copy; 2024 - Built for fun</p>

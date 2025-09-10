@@ -1,4 +1,3 @@
-
 import React, { useState, useContext, useMemo } from 'react';
 import { AppContext, Screen } from '../contexts/AppContext';
 import { Game, Round } from '../types';
@@ -14,6 +13,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ game, setGame }) => {
     const [currentScores, setCurrentScores] = useState<Round>(
         game.playerIds.reduce((acc, id) => ({ ...acc, [id]: 0 }), {})
     );
+    const [isSaving, setIsSaving] = useState(false);
 
     const gamePlayers = useMemo(() => {
         return players.filter(p => game.playerIds.includes(p.id));
@@ -40,7 +40,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ game, setGame }) => {
         setCurrentScores(game.playerIds.reduce((acc, id) => ({ ...acc, [id]: 0 }), {}));
     };
 
-    const handleEndGame = () => {
+    const handleEndGame = async () => {
+        setIsSaving(true);
         let finalGame = { ...game };
         
         // Add current round if not empty
@@ -72,11 +73,18 @@ const GameScreen: React.FC<GameScreenProps> = ({ game, setGame }) => {
 
         finalGame.winnerId = winnerId;
         finalGame.loserId = loserId;
-
-        addGame(finalGame);
-        setSelectedGame(finalGame);
-        setActiveGame(null);
-        setScreen(Screen.GAME_SUMMARY);
+        
+        const { id, ...gameDataToSave } = finalGame;
+        const savedGame = await addGame(gameDataToSave);
+        
+        if (savedGame) {
+            setSelectedGame(savedGame);
+            setActiveGame(null);
+            setScreen(Screen.GAME_SUMMARY);
+        } else {
+            // Error is handled in context, but we can stop loading state here
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -140,9 +148,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ game, setGame }) => {
                 </button>
                 <button
                     onClick={handleEndGame}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition"
+                    disabled={isSaving}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition disabled:bg-gray-500"
                 >
-                    Terminer la partie
+                    {isSaving ? 'Enregistrement...' : 'Terminer la partie'}
                 </button>
             </div>
         </div>

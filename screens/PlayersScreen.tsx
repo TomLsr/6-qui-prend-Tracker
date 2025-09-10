@@ -10,31 +10,33 @@ const PlayersScreen: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newPseudo, setNewPseudo] = useState('');
     const [selectedAvatar, setSelectedAvatar] = useState(AVATARS[0].id);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleAddPlayer = () => {
+    const handleAddPlayer = async () => {
         if (newPseudo.trim() === '' || players.some(p => p.pseudo.toLowerCase() === newPseudo.trim().toLowerCase())) {
             alert("Le pseudo ne peut pas être vide et doit être unique.");
             return;
         }
-        const newPlayer: Player = {
-            id: Date.now().toString(),
+        setIsSubmitting(true);
+        const newPlayerData: Omit<Player, 'id'> = {
             pseudo: newPseudo.trim(),
             avatar: selectedAvatar,
             isActive: true,
         };
-        addPlayer(newPlayer);
+        await addPlayer(newPlayerData);
         setNewPseudo('');
         setSelectedAvatar(AVATARS[0].id);
         setIsModalOpen(false);
+        setIsSubmitting(false);
     };
     
-    const togglePlayerStatus = (player: Player) => {
-        updatePlayer({ ...player, isActive: !player.isActive });
+    const togglePlayerStatus = async (player: Player) => {
+        await updatePlayer({ ...player, isActive: !player.isActive });
     };
 
-    const handleDeletePlayer = (player: Player) => {
+    const handleDeletePlayer = async (player: Player) => {
         if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${player.pseudo} ? Cette action est irréversible.`)) {
-            deletePlayer(player.id);
+            await deletePlayer(player.id);
         }
     }
 
@@ -110,8 +112,12 @@ const PlayersScreen: React.FC = () => {
                             </div>
                         ))}
                     </div>
-                    <button onClick={handleAddPlayer} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition">
-                        Valider
+                    <button 
+                        onClick={handleAddPlayer} 
+                        disabled={isSubmitting}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition disabled:bg-gray-500"
+                    >
+                        {isSubmitting ? 'Ajout...' : 'Valider'}
                     </button>
                 </div>
             </Modal>
