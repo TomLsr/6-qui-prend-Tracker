@@ -9,6 +9,7 @@ import LeaderboardScreen from './screens/LeaderboardScreen';
 import PlayerProfileScreen from './screens/PlayerProfileScreen';
 import HallOfFameScreen from './screens/HallOfFameScreen';
 import HistoryScreen from './screens/HistoryScreen';
+import { GameData } from './types';
 
 const App: React.FC = () => {
     const { 
@@ -29,7 +30,7 @@ const App: React.FC = () => {
                 return <NewGameScreen />;
             case Screen.GAME:
                 if (activeGame) {
-                    return <GameScreen game={activeGame} setGame={setActiveGame} />;
+                    return <GameScreen game={activeGame} setGame={setActiveGame as React.Dispatch<React.SetStateAction<GameData | null>>} />;
                 }
                 setScreen(Screen.NEW_GAME);
                 return null;

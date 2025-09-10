@@ -1,28 +1,29 @@
+import { Player, GameData } from '../types';
 
-import { Player, Game } from '../types';
+// NOTE: This implementation assumes a simplified game model where `rounds` are not tracked individually.
+// The average score per round is effectively the average score per game.
 
-export const calculateLeaderboard = (players: Player[], games: Game[]) => {
+export const calculateLeaderboard = (players: Player[], games: GameData[]) => {
     const stats = players.map(player => {
-        const playerGames = games.filter(g => g.playerIds.includes(player.id));
+        const playerGames = games.filter(g => g.participants.some(p => p.player.id === player.id));
         if (playerGames.length === 0) {
             return null;
         }
         
         let totalPoints = 0;
-        let totalRounds = 0;
         playerGames.forEach(game => {
-            totalPoints += game.totals[player.id] || 0;
-            totalRounds += game.rounds.length;
+            const participant = game.participants.find(p => p.player.id === player.id);
+            totalPoints += participant?.score || 0;
         });
         
-        const avgScorePerRound = totalRounds > 0 ? totalPoints / totalRounds : 0;
+        const avgScorePerGame = totalPoints / playerGames.length;
 
         return {
             player,
             gamesPlayed: playerGames.length,
-            avgScorePerRound,
+            avgScorePerRound: avgScorePerGame, // Using per game as rounds are not stored
             totalPoints,
-            totalRounds,
+            totalRounds: playerGames.length, // Placeholder
         };
     }).filter((stat): stat is NonNullable<typeof stat> => stat !== null);
 
@@ -30,11 +31,11 @@ export const calculateLeaderboard = (players: Player[], games: Game[]) => {
 };
 
 
-export const calculatePlayerProfile = (playerId: string, allPlayers: Player[], allGames: Game[]) => {
+export const calculatePlayerProfile = (playerId: string, allPlayers: Player[], allGames: GameData[]) => {
     const player = allPlayers.find(p => p.id === playerId);
     if (!player) return null;
     
-    const playerGames = allGames.filter(g => g.playerIds.includes(playerId));
+    const playerGames = allGames.filter(g => g.participants.some(p => p.player.id === playerId));
     if (playerGames.length === 0) {
         return {
             player,
@@ -47,23 +48,21 @@ export const calculatePlayerProfile = (playerId: string, allPlayers: Player[], a
     }
 
     let totalPoints = 0;
-    let totalRounds = 0;
     let wins = 0;
     let bestScore: number | null = null;
     let worstScore: number | null = null;
 
     playerGames.forEach(game => {
-        const score = game.totals[playerId];
+        const participant = game.participants.find(p => p.player.id === playerId)!;
+        const score = participant.score;
         totalPoints += score;
-        totalRounds += game.rounds.length;
-        if (game.winnerId === playerId) wins++;
+        if (game.winner_id === playerId) wins++;
         if (bestScore === null || score < bestScore) bestScore = score;
         if (worstScore === null || score > worstScore) worstScore = score;
     });
 
     const gamesPlayed = playerGames.length;
     const avgScorePerGame = totalPoints / gamesPlayed;
-    const avgScorePerRound = totalRounds > 0 ? totalPoints / totalRounds : 0;
     const winRate = (wins / gamesPlayed) * 100;
 
     // Nemesis & Lucky Charm
@@ -78,19 +77,19 @@ export const calculatePlayerProfile = (playerId: string, allPlayers: Player[], a
     });
 
     playerGames.forEach(game => {
-        const opponents = game.playerIds.filter(id => id !== playerId);
-        opponents.forEach(oppId => {
-            opponentsStats[oppId].games++;
-            if (game.winnerId === playerId) opponentsStats[oppId].wins++;
-            if (game.winnerId === oppId) opponentsStats[oppId].losses++;
+        const opponents = game.participants.filter(p => p.player.id !== playerId);
+        opponents.forEach(opp => {
+            opponentsStats[opp.player.id].games++;
+            if (game.winner_id === playerId) opponentsStats[opp.player.id].wins++;
+            if (game.winner_id === opp.player.id) opponentsStats[opp.player.id].losses++;
         });
 
-        if (game.winnerId === playerId) {
-            const allies = game.playerIds.filter(id => id !== playerId && id !== game.loserId);
-             allies.forEach(allyId => {
-                if (alliesStats[allyId]) {
-                    alliesStats[allyId].games++;
-                    alliesStats[allyId].wins++;
+        if (game.winner_id === playerId) {
+            const allies = game.participants.filter(p => p.player.id !== playerId && p.player.id !== game.loser_id);
+             allies.forEach(ally => {
+                if (alliesStats[ally.player.id]) {
+                    alliesStats[ally.player.id].games++;
+                    alliesStats[ally.player.id].wins++;
                 }
             });
         }
@@ -123,14 +122,14 @@ export const calculatePlayerProfile = (playerId: string, allPlayers: Player[], a
     return {
         player,
         gamesPlayed, wins, winRate,
-        avgScorePerGame, avgScorePerRound,
+        avgScorePerGame, avgScorePerRound: avgScorePerGame, // Using per game
         bestScore, worstScore,
-        totalPoints, totalRounds,
+        totalPoints, totalRounds: gamesPlayed, // Placeholder
         nemesis, luckyCharm
     };
 };
 
-export const calculateHallOfFame = (players: Player[], games: Game[]) => {
+export const calculateHallOfFame = (players: Player[], games: GameData[]) => {
     if (players.length === 0 || games.length === 0) {
         return { king: null, collector: null, metronome: null };
     }
@@ -142,9 +141,12 @@ export const calculateHallOfFame = (players: Player[], games: Game[]) => {
     const metronome = leaderboard.length > 0 ? { player: leaderboard[0].player, score: leaderboard[0].avgScorePerRound } : null;
 
     players.forEach(player => {
-        const playerGames = games.filter(g => g.playerIds.includes(player.id));
-        const wins = playerGames.filter(g => g.winnerId === player.id).length;
-        const totalPoints = playerGames.reduce((sum, game) => sum + (game.totals[player.id] || 0), 0);
+        const playerGames = games.filter(g => g.participants.some(p => p.player.id === player.id));
+        const wins = playerGames.filter(g => g.winner_id === player.id).length;
+        const totalPoints = playerGames.reduce((sum, game) => {
+            const participant = game.participants.find(p => p.player.id === player.id);
+            return sum + (participant?.score || 0);
+        }, 0);
 
         if (!king || wins > king.wins) {
             king = { player, wins };

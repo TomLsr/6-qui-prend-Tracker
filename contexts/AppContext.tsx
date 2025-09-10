@@ -1,5 +1,5 @@
 import React, { createContext, useState, ReactNode, useEffect } from 'react';
-import { Player, Game } from '../types';
+import { Player, GameData, GameParticipant } from '../types';
 import { supabase } from '../services/supabaseClient';
 
 export enum Screen {
@@ -14,23 +14,35 @@ export enum Screen {
     HISTORY,
 }
 
+interface NewGameData {
+    date: string;
+    participants: {
+        player_id: string;
+        score: number;
+        is_winner: boolean;
+        is_loser: boolean;
+    }[];
+    winner_id?: string;
+    loser_id?: string;
+}
+
 interface AppContextType {
     screen: Screen;
     setScreen: (screen: Screen) => void;
     players: Player[];
     setPlayers: React.Dispatch<React.SetStateAction<Player[]>>;
-    games: Game[];
-    setGames: React.Dispatch<React.SetStateAction<Game[]>>;
+    games: GameData[];
+    setGames: React.Dispatch<React.SetStateAction<GameData[]>>;
     addPlayer: (playerData: Omit<Player, 'id'>) => Promise<Player | null>;
     updatePlayer: (updatedPlayer: Player) => Promise<void>;
     deletePlayer: (playerId: string) => Promise<void>;
-    addGame: (gameData: Omit<Game, 'id'>) => Promise<Game | null>;
-    activeGame: Game | null;
-    setActiveGame: React.Dispatch<React.SetStateAction<Game | null>>;
+    addGame: (gameData: NewGameData) => Promise<GameData | null>;
+    activeGame: GameData | null;
+    setActiveGame: React.Dispatch<React.SetStateAction<GameData | null>>;
     selectedPlayerId: string | null;
     setSelectedPlayerId: React.Dispatch<React.SetStateAction<string | null>>;
-    selectedGame: Game | null;
-    setSelectedGame: React.Dispatch<React.SetStateAction<Game | null>>;
+    selectedGame: GameData | null;
+    setSelectedGame: React.Dispatch<React.SetStateAction<GameData | null>>;
     loading: boolean;
 }
 
@@ -39,10 +51,10 @@ export const AppContext = createContext<AppContextType>({} as AppContextType);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [screen, setScreen] = useState<Screen>(Screen.HOME);
     const [players, setPlayers] = useState<Player[]>([]);
-    const [games, setGames] = useState<Game[]>([]);
-    const [activeGame, setActiveGame] = useState<Game | null>(null);
+    const [games, setGames] = useState<GameData[]>([]);
+    const [activeGame, setActiveGame] = useState<GameData | null>(null);
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
-    const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+    const [selectedGame, setSelectedGame] = useState<GameData | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -53,9 +65,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 if (playersError) throw playersError;
                 setPlayers(playersData || []);
 
-                const { data: gamesData, error: gamesError } = await supabase.from('games').select('*').order('date', { ascending: false });
+                // Fetch games with related players
+                const { data: gamesData, error: gamesError } = await supabase
+                    .from('games')
+                    .select('*, game_players(*, players(*))')
+                    .order('date', { ascending: false });
+                
                 if (gamesError) throw gamesError;
-                setGames(gamesData || []);
+
+                // FIX: Cast gamesData to any to handle complex join type from Supabase
+                const formattedGames: GameData[] = (gamesData as any[])?.map(game => {
+                    const participants: GameParticipant[] = game.game_players.map((gp: any) => ({
+                        player: gp.players,
+                        score: gp.score,
+                        is_winner: gp.is_winner,
+                        is_loser: gp.is_loser
+                    })).filter((p: {player: any}) => p.player); // Filter out potential null players
+
+                    return {
+                        id: game.id,
+                        date: game.date,
+                        winner_id: game.winner_id,
+                        loser_id: game.loser_id,
+                        participants,
+                    };
+                });
+                
+                setGames(formattedGames || []);
+
             } catch (error) {
                 console.error("Error fetching data:", error);
             } finally {
@@ -96,7 +133,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     const deletePlayer = async (playerId: string) => {
-        const playerHasGames = games.some(game => game.playerIds.includes(playerId));
+        const playerHasGames = games.some(game => game.participants.some(p => p.player.id === playerId));
         if (playerHasGames) {
             alert("Impossible de supprimer un joueur qui a déjà participé à des parties. Vous pouvez le rendre inactif à la place.");
             return;
@@ -112,16 +149,55 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     };
 
-    const addGame = async (gameData: Omit<Game, 'id'>): Promise<Game | null> => {
+    const addGame = async (gameData: NewGameData): Promise<GameData | null> => {
         try {
-            const { data, error } = await supabase.from('games').insert([gameData]).select();
-            if (error) throw error;
-            if (data && data[0]) {
-                const newGame = data[0];
-                setGames(prev => [newGame, ...prev]);
-                return newGame;
+            // 1. Insert the game to get an ID
+            const { data: gameResult, error: gameError } = await supabase
+                .from('games')
+                .insert([{ date: gameData.date, winner_id: gameData.winner_id, loser_id: gameData.loser_id }])
+                .select()
+                .single();
+
+            if (gameError) throw gameError;
+
+            // FIX: Handle the case where gameResult can be null.
+            if (!gameResult) {
+                console.error("Failed to create game.");
+                return null;
             }
-            return null;
+            const newGameId = gameResult.id;
+
+            // 2. Insert each participant into game_players
+            const gamePlayersToInsert = gameData.participants.map(p => ({
+                game_id: newGameId,
+                player_id: p.player_id,
+                score: p.score,
+                is_winner: p.is_winner,
+                is_loser: p.is_loser,
+            }));
+
+            const { error: gamePlayersError } = await supabase.from('game_players').insert(gamePlayersToInsert);
+            if (gamePlayersError) throw gamePlayersError;
+
+            // 3. Construct the full GameData object to return and update state
+            const participantsWithPlayers: GameParticipant[] = gameData.participants.map(p => ({
+                player: players.find(player => player.id === p.player_id)!,
+                score: p.score,
+                is_winner: p.is_winner,
+                is_loser: p.is_loser,
+            }));
+
+            const newGame: GameData = {
+                id: newGameId,
+                date: gameData.date,
+                winner_id: gameData.winner_id,
+                loser_id: gameData.loser_id,
+                participants: participantsWithPlayers,
+            };
+
+            setGames(prev => [newGame, ...prev]);
+            return newGame;
+
         } catch(error) {
             console.error('Error adding game:', error);
             alert('Erreur lors de l\'enregistrement de la partie.');

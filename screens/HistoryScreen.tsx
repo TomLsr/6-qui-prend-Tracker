@@ -1,13 +1,13 @@
 
 import React, { useContext } from 'react';
 import { AppContext, Screen } from '../contexts/AppContext';
-import { Game } from '../types';
+import { GameData } from '../types';
 import PlayerAvatar from '../components/PlayerAvatar';
 
 const HistoryScreen: React.FC = () => {
     const { games, players, setScreen, setSelectedGame } = useContext(AppContext);
     
-    const viewGameSummary = (game: Game) => {
+    const viewGameSummary = (game: GameData) => {
         setSelectedGame(game);
         setScreen(Screen.GAME_SUMMARY);
     };
@@ -26,8 +26,7 @@ const HistoryScreen: React.FC = () => {
             ) : (
                 <div className="space-y-4">
                     {games.map(game => {
-                        const gamePlayers = game.playerIds.map(id => players.find(p => p.id === id)).filter(Boolean);
-                        const winner = players.find(p => p.id === game.winnerId);
+                        const winner = players.find(p => p.id === game.winner_id);
 
                         return (
                             <div 
@@ -38,10 +37,10 @@ const HistoryScreen: React.FC = () => {
                                 <div>
                                     <p className="font-bold text-lg">{new Date(game.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                                     <div className="flex flex-wrap items-center mt-2 gap-2">
-                                        {gamePlayers.map(p => p && (
-                                            <div key={p.id} className="flex items-center bg-gray-700 px-2 py-1 rounded-full">
-                                                <PlayerAvatar avatarId={p.avatar} className="w-5 h-5 mr-2" />
-                                                <span className="text-sm">{p.pseudo}</span>
+                                        {game.participants.map(({ player }) => (
+                                            <div key={player.id} className="flex items-center bg-gray-700 px-2 py-1 rounded-full">
+                                                <PlayerAvatar avatarId={player.avatar} className="w-5 h-5 mr-2" />
+                                                <span className="text-sm">{player.pseudo}</span>
                                             </div>
                                         ))}
                                     </div>

@@ -6,16 +6,21 @@ export interface Player {
     isActive: boolean;
 }
 
-export interface Round {
-    [playerId: string]: number;
+export interface GameParticipant {
+    player: Player;
+    score: number;
+    is_winner: boolean;
+    is_loser: boolean;
 }
 
 export interface Game {
     id: string;
     date: string;
-    playerIds: string[];
-    rounds: Round[];
-    totals: { [playerId: string]: number };
-    winnerId?: string;
-    loserId?: string;
+    winner_id?: string;
+    loser_id?: string;
+}
+
+// Type de données complet utilisé côté client
+export interface GameData extends Game {
+    participants: GameParticipant[];
 }

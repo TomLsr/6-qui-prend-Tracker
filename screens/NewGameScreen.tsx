@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { AppContext, Screen } from '../contexts/AppContext';
-import { Player, Game } from '../types';
+import { Player, GameData } from '../types';
 import PlayerAvatar from '../components/PlayerAvatar';
 import Modal from '../components/Modal';
 import { AVATARS } from '../constants';
@@ -31,12 +31,20 @@ const NewGameScreen: React.FC = () => {
             return;
         }
 
-        const newGame: Game = {
-            id: Date.now().toString(),
+        const participants = selectedPlayerIds.map(id => {
+            const player = players.find(p => p.id === id)!;
+            return {
+                player,
+                score: 0,
+                is_winner: false,
+                is_loser: false,
+            };
+        });
+
+        const newGame: GameData = {
+            id: Date.now().toString(), // Temporary client-side ID
             date: gameDate,
-            playerIds: selectedPlayerIds,
-            rounds: [],
-            totals: selectedPlayerIds.reduce((acc, id) => ({ ...acc, [id]: 0 }), {}),
+            participants,
         };
 
         setActiveGame(newGame);
